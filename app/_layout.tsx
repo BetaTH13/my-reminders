@@ -31,9 +31,10 @@ export default function RootLayout() {
   return (
     <SettingsProvider>
       <Providers>
-        <Stack screenOptions={{ headerStyle: { backgroundColor: '#1C2229' }, headerTintColor: '#fff' }}>
-          <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack screenOptions={{headerShown: false, headerStyle: { backgroundColor: '#1C2229' }, headerTintColor: '#fff' }}>
+          <Stack.Screen name="index" options={{  }} />
           <Stack.Screen name="edit" options={{ title: 'Reminder' }} />
+          <Stack.Screen name="settings" /> 
         </Stack>
       </Providers>
     </SettingsProvider>

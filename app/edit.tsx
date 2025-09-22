@@ -1,3 +1,4 @@
+import AppHeader from '@/components/AppHeader';
 import { Button, Card, Text } from '@/components/Themed';
 import { useReminders } from '@/contexts/RemindersContext';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -49,6 +50,7 @@ export default function EditReminder() {
 
   return (
     <View style={{ padding: 16, backgroundColor: theme.colors.background, flex: 1 }}>
+      <AppHeader />
       <Card accessibilityLabel={existing ? 'Edit reminder fields' : 'Add reminder fields'}>
         <Text weight="700" style={{ marginBottom: 12 }}>{existing ? 'Edit Reminder' : 'Add Reminder'}</Text>
 

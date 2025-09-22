@@ -17,16 +17,16 @@ export type Theme = {
 export const NormalTheme: Theme = {
     name: 'normal',
     colors: {
-        background: '#101418',
-        card: '#1C2229',
-        text: '#FFFFFF',
-        mutedText: '#C7CDD4',
-        primary: '#1976D2',
-        border: '#2B333B',
-        danger: '#D32F2F',
-        upcoming: '#1976D2',
-        disabled: '#9E9E9E',
-        buttonText: '#FFFFFF'
+        background: '#F7F9FC',   // subtle off-white
+        card: '#FFFFFF',
+        text: '#111827',         // slate-900
+        mutedText: '#6B7280',    // gray-500
+        primary: '#2563EB',      // blue-600
+        border: '#E5E7EB',       // gray-200
+        danger: '#DC2626',       // red-600
+        upcoming: '#2563EB',     // blue-600
+        disabled: '#9CA3AF',     // gray-400
+        buttonText: '#FFFFFF',
     }
 };
 
