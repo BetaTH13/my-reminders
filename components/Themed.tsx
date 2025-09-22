@@ -1,12 +1,12 @@
 import { useSettings } from "@/contexts/SettingsContext";
 import React from "react";
 import {
-    PressableProps,
-    Pressable as RNPressable,
-    Text as RNText,
-    View as RNView,
-    TextProps,
-    ViewProps,
+  PressableProps,
+  Pressable as RNPressable,
+  Text as RNText,
+  View as RNView,
+  TextProps,
+  ViewProps,
 } from "react-native";
 
 export const View: React.FC<ViewProps> = ({ style, ...rest }) => {
@@ -60,10 +60,10 @@ export const Text: React.FC<TextProps & { weight?: "400" | "600" | "700" }> = ({
 };
 
 export const Button: React.FC<
-  PressableProps & { label: string; variant?: "primary" | "secondary" } & {
+  PressableProps & { label: string; variant?: "primary" | "secondary", fullWidth?: boolean } & {
     accessibilityLabel?: string;
   }
-> = ({ label, variant = "primary", style, accessibilityLabel, ...rest }) => {
+> = ({ label, variant = "primary", style, fullWidth = false, accessibilityLabel, ...rest }) => {
   const { theme, settings } = useSettings();
   const bg = variant === "primary" ? theme.colors.primary : theme.colors.card;
   const textColor =
@@ -81,6 +81,9 @@ export const Button: React.FC<
           alignItems: "center",
           justifyContent: "center",
           opacity: pressed ? 0.8 : 1,
+          maxWidth: '100%', 
+          minWidth: 0,
+          alignSelf: fullWidth ? 'stretch' : 'auto',
         },
         style,
       ]}
@@ -91,6 +94,8 @@ export const Button: React.FC<
           color: textColor,
           fontSize: 18 * settings.textScale,
           fontWeight: "700",
+          textAlign: 'center',
+          flexShrink: 1,
         }}
       >
         {label}
