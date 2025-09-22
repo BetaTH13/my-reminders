@@ -34,8 +34,6 @@ export default function AppHeader({
         paddingBottom: 12,
         paddingHorizontal: 24,
         backgroundColor: theme.colors.background,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.border,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",

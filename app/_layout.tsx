@@ -8,7 +8,6 @@ import { StatusBar } from 'react-native';
 
 Notifications.setNotificationHandler({
   handleNotification: async (): Promise<Notifications.NotificationBehavior> => ({ 
-    shouldShowAlert: true, 
     shouldPlaySound: true, 
     shouldSetBadge: false,
     shouldShowBanner: true,

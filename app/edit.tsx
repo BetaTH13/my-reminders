@@ -3,9 +3,10 @@ import { Button, Card, Text } from '@/components/Themed';
 import { useReminders } from '@/contexts/RemindersContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import type { Reminder } from '@/lib/types';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { Alert, TextInput, View } from 'react-native';
+import React, { useMemo, useMemo as useMemoReact, useState } from 'react';
+import { Alert, Platform, TextInput, View } from 'react-native';
 
 export default function EditReminder() {
   const router = useRouter();
@@ -20,6 +21,8 @@ export default function EditReminder() {
   const [hour, setHour] = useState(existing?.hour ?? 8);
   const [minute, setMinute] = useState(existing?.minute ?? 0);
   const [enabled, setEnabled] = useState(existing?.enabled ?? true);
+
+   const [showIosPicker, setShowIosPicker] = useState(false);
 
   const save = async () => {
     if (!name.trim()) return Alert.alert('Name required', 'Please enter a medication name.');
@@ -36,6 +39,29 @@ export default function EditReminder() {
 
   const adjust = (setter: React.Dispatch<React.SetStateAction<number>>, min: number, max: number, delta: number) => () =>
     setter(v => Math.max(min, Math.min(max, v + delta)));
+
+  const timeValue = useMemoReact(() => {
+    const d = new Date();
+    d.setHours(hour, minute, 0, 0);
+    return d;
+  }, [hour, minute]);
+
+  const openTimePicker = () => {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: timeValue,
+        onChange: (_event, selected) => {
+          if (!selected) return; // dismissed
+          setHour(selected.getHours());
+          setMinute(selected.getMinutes());
+        },
+        mode: 'time',
+        is24Hour: true,
+      });
+    } else {
+      setShowIosPicker(s => !s);
+    }
+  };
 
   const inputStyle = {
     backgroundColor: theme.colors.card,
@@ -80,26 +106,42 @@ export default function EditReminder() {
           </View>
 
           <Card>
-            <Text weight="600" style={{ marginBottom: 8 }}>Time (24h)</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ alignItems: 'center' }}>
-                <Text>Hour</Text>
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                  <Button label="-" variant="secondary" onPress={adjust(setHour, 0, 23, -1)} accessibilityLabel="Decrease hour" />
-                  <Button label={hour.toString().padStart(2, '0')} variant="secondary" onPress={() => {}} accessibilityLabel={`Hour ${hour}`} />
-                  <Button label="+" variant="secondary" onPress={adjust(setHour, 0, 23, +1)} accessibilityLabel="Increase hour" />
-                </View>
-              </View>
-              <View style={{ alignItems: 'center' }}>
-                <Text>Minute</Text>
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                  <Button label="-" variant="secondary" onPress={adjust(setMinute, 0, 59, -1)} accessibilityLabel="Decrease minute" />
-                  <Button label={minute.toString().padStart(2, '0')} variant="secondary" onPress={() => {}} accessibilityLabel={`Minute ${minute}`} />
-                  <Button label="+" variant="secondary" onPress={adjust(setMinute, 0, 59, +1)} accessibilityLabel="Increase minute" />
-                </View>
-              </View>
+            <Text weight="600" style={{ marginBottom: 8 }}>Time (24-hour)</Text>
+
+            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
+              <Button
+                label={`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`}
+                variant="secondary"
+                onPress={openTimePicker}
+                accessibilityLabel="Change reminder time"
+              />
+              <Text style={{ alignSelf: 'center' }}>Tap to change</Text>
             </View>
-            <Text style={{ marginTop: 8 }}>Selected time: {hour.toString().padStart(2,'0')}:{minute.toString().padStart(2,'0')}</Text>
+
+            {/* iOS inline picker (Android uses modal via DateTimePickerAndroid) */}
+            {Platform.OS === 'ios' && showIosPicker && (
+              <View style={{ marginTop: 8 }}>
+                <DateTimePicker
+                  value={timeValue}
+                  mode="time"
+                  is24Hour
+                  display="spinner" // iOS-friendly wheel; change to 'compact' if you prefer
+                  onChange={(_e, selected) => {
+                    if (!selected) return;
+                    setHour(selected.getHours());
+                    setMinute(selected.getMinutes());
+                  }}
+                  themeVariant={theme.name === 'normal' ? 'light' : 'dark'}
+                />
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                  <Button label="Done" onPress={() => setShowIosPicker(false)} accessibilityLabel="Close time picker" />
+                </View>
+              </View>
+            )}
+
+            <Text style={{ marginTop: 8 }}>
+              Selected time: {hour.toString().padStart(2, '0')}:{minute.toString().padStart(2, '0')}
+            </Text>
           </Card>
 
           <Card>
