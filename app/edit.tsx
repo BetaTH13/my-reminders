@@ -24,15 +24,17 @@ const WD_LABELS: { key: Weekday; label: string }[] = [
 
 export default function EditReminder() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const raw = useLocalSearchParams().id;
+  const id = Array.isArray(raw) ? raw[0] : raw;
   const { reminders, add, update, toggleEnabled } = useReminders();
   const { theme, settings } = useSettings();
   const insets = useSafeAreaInsets();
 
   const existing: Reminder | undefined = useMemo(
-    () => reminders.find((r) => r.id === params.id),
-    [reminders, params.id]
+    () => reminders.find(r => r.id === id),
+    [reminders, id]
   );
+
 
   const [name, setName] = useState(existing?.name ?? "");
   const [hour, setHour] = useState(existing?.hour ?? 8);
@@ -52,7 +54,6 @@ export default function EditReminder() {
 
     if (existing) {
       await update(existing.id, { name, hour, minute, weekdays });
-      await toggleEnabled(existing.id, enabled);
     } else {
       await add({
         name,

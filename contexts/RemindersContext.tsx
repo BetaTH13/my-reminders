@@ -1,4 +1,7 @@
-import { cancelNotifications, scheduleWeeklyNotifications } from "@/lib/notifications";
+import {
+  cancelNotifications,
+  scheduleWeeklyNotifications,
+} from "@/lib/notifications";
 import { readReminders, writeReminders } from "@/lib/storage";
 import type { Reminder, Weekday } from "@/lib/types";
 import React, { createContext, useContext, useEffect, useState } from "react";
@@ -19,16 +22,16 @@ function todayMon0(): Weekday {
 
 const ALL_DAYS: Weekday[] = [0, 1, 2, 3, 4, 5, 6];
 
-
 type CtxType = {
   reminders: Reminder[];
-  add: (r: Omit<Reminder, 'id' | 'notificationIds' | 'missed'>) => Promise<void>;
+  add: (
+    r: Omit<Reminder, "id" | "notificationIds" | "missed">
+  ) => Promise<void>;
   update: (id: string, patch: Partial<Reminder>) => Promise<void>;
   remove: (id: string) => Promise<void>;
   toggleEnabled: (id: string, enabled: boolean) => Promise<void>;
   refreshMissedFlags: () => void;
 };
-
 
 const Ctx = createContext<CtxType>({
   reminders: [],
@@ -41,7 +44,9 @@ const Ctx = createContext<CtxType>({
 
 export const useReminders = () => useContext(Ctx);
 
-export const RemindersProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const RemindersProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [reminders, setReminders] = useState<Reminder[]>([]);
 
   // Load from disk (and migrate old shape if needed)
@@ -55,8 +60,15 @@ export const RemindersProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         hour: r.hour,
         minute: r.minute,
         enabled: r.enabled ?? true,
-        weekdays: Array.isArray(r.weekdays) && r.weekdays.length ? r.weekdays : ALL_DAYS.slice(),
-        notificationIds: Array.isArray(r.notificationIds) ? r.notificationIds : (r.notificationId ? [r.notificationId] : []),
+        weekdays:
+          Array.isArray(r.weekdays) && r.weekdays.length
+            ? r.weekdays
+            : ALL_DAYS.slice(),
+        notificationIds: Array.isArray(r.notificationIds)
+          ? r.notificationIds
+          : r.notificationId
+          ? [r.notificationId]
+          : [],
         missed: !!r.missed,
       }));
       setReminders(normalized);
@@ -74,11 +86,19 @@ export const RemindersProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!next.weekdays.length) return [];
 
     const title = next.name;
-    const body = `Reminder at ${String(next.hour).padStart(2, '0')}:${String(next.minute).padStart(2, '0')}`;
-    return scheduleWeeklyNotifications(title, body, next.hour, next.minute, next.weekdays);
+    const body = `Reminder at ${String(next.hour).padStart(2, "0")}:${String(
+      next.minute
+    ).padStart(2, "0")}`;
+    return scheduleWeeklyNotifications(
+      title,
+      body,
+      next.hour,
+      next.minute,
+      next.weekdays
+    );
   }
 
-  const add: CtxType['add'] = async (input) => {
+  const add: CtxType["add"] = async (input) => {
     const r: Reminder = {
       id: uuidv4(),
       name: input.name,
@@ -91,34 +111,56 @@ export const RemindersProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     const ids = await reschedule(r);
     r.notificationIds = ids;
-    setReminders(list => [r, ...list]);
+    setReminders((list) => [r, ...list]);
   };
 
-  const update: CtxType['update'] = async (id, patch) => {
-    const current = reminders.find(x => x.id === id);
+  const update: CtxType["update"] = async (id, patch) => {
+    const current = reminders.find((x) => x.id === id);
     if (!current) return;
     const next: Reminder = {
       ...current,
       ...patch,
-      // keep arrays safe
-      weekdays: patch.weekdays !== undefined ? patch.weekdays : current.weekdays,
+      weekdays:
+        patch.weekdays !== undefined ? patch.weekdays : current.weekdays,
+      enabled: patch.enabled ?? current.enabled,
       notificationIds: current.notificationIds,
     };
     const ids = await reschedule(next);
     next.notificationIds = ids;
-    setReminders(list => list.map(x => (x.id === id ? next : x)));
+    await cancelNotifications(current.notificationIds);
+
+    // reschedule if enabled and has days
+    if (next.enabled && next.weekdays.length) {
+      next.notificationIds = await scheduleWeeklyNotifications(
+        next.name,
+        `Reminder at ${String(next.hour).padStart(2, "0")}:${String(
+          next.minute
+        ).padStart(2, "0")}`,
+        next.hour,
+        next.minute,
+        next.weekdays
+      );
+    } else {
+      next.notificationIds = [];
+    }
+
+    setReminders((list) => list.map((x) => (x.id === id ? next : x)));
   };
 
-  const remove: CtxType['remove'] = async (id) => {
-    const r = reminders.find(x => x.id === id);
+  const remove: CtxType["remove"] = async (id) => {
+    const r = reminders.find((x) => x.id === id);
     if (r) await cancelNotifications(r.notificationIds);
-    setReminders(list => list.filter(x => x.id !== id));
+    setReminders((list) => list.filter((x) => x.id !== id));
   };
 
-  const toggleEnabled: CtxType['toggleEnabled'] = async (id, enabled) => {
-    const current = reminders.find(x => x.id === id);
+  const toggleEnabled: CtxType["toggleEnabled"] = async (id, enabled) => {
+    const current = reminders.find((x) => x.id === id);
     if (!current) return;
-    let next: Reminder = { ...current, enabled, missed: enabled ? current.missed : false };
+    let next: Reminder = {
+      ...current,
+      enabled,
+      missed: enabled ? current.missed : false,
+    };
     if (enabled) {
       const ids = await reschedule(next);
       next.notificationIds = ids;
@@ -126,13 +168,13 @@ export const RemindersProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       await cancelNotifications(next.notificationIds);
       next.notificationIds = [];
     }
-    setReminders(list => list.map(x => (x.id === id ? next : x)));
+    setReminders((list) => list.map((x) => (x.id === id ? next : x)));
   };
 
   const refreshMissedFlags = () => {
     const today = todayMon0();
-    setReminders(list =>
-      list.map(item => {
+    setReminders((list) =>
+      list.map((item) => {
         if (!item.enabled) return item;
         const isToday = item.weekdays.includes(today);
         const missedNow = isToday && isTimePassedToday(item.hour, item.minute);
@@ -143,7 +185,16 @@ export const RemindersProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   return (
-    <Ctx.Provider value={{ reminders, add, update, remove, toggleEnabled, refreshMissedFlags }}>
+    <Ctx.Provider
+      value={{
+        reminders,
+        add,
+        update,
+        remove,
+        toggleEnabled,
+        refreshMissedFlags,
+      }}
+    >
       {children}
     </Ctx.Provider>
   );
