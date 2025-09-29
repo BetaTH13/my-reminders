@@ -1,10 +1,12 @@
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
 export type Reminder = {
     id: string;
     name: string;
-    dosage: string;
     hour: number;
     minute: number;
     enabled: boolean;
-    notificationId?: string | null;
+    weekdays: Weekday[];  
+    notificationIds: string[];
     missed: boolean; // stays true until disabled
 };
