@@ -1,0 +1,33 @@
+name: Release tag on merge + PR preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches:
+      - master                                        
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-tag-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tag-and-preview:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preview on PR / Tag on merge
+        uses: BetaTH13/release-tag-commit@ab2519ac2c729d5e862f28ecfcb412a1a851be8f
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          v_prefix: "false"
+          create_release: "true"
+          generate_release_notes: "true"
+          mark_release_as_latest: "true"
+          comment_pr: "true"

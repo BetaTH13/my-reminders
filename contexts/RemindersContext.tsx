@@ -1,9 +1,9 @@
 import {
-    cancelNotification,
-    scheduleDailyNotification,
+  cancelNotifications,
+  scheduleWeeklyNotifications,
 } from "@/lib/notifications";
 import { readReminders, writeReminders } from "@/lib/storage";
-import type { Reminder } from "@/lib/types";
+import type { Reminder, Weekday } from "@/lib/types";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
@@ -15,14 +15,25 @@ function isTimePassedToday(hour: number, minute: number) {
   return now.getTime() > t.getTime();
 }
 
-const Ctx = createContext<{
+function todayMon0(): Weekday {
+  const js = new Date().getDay();
+  return ((js + 6) % 7) as Weekday;
+}
+
+const ALL_DAYS: Weekday[] = [0, 1, 2, 3, 4, 5, 6];
+
+type CtxType = {
   reminders: Reminder[];
-  add: (r: Omit<Reminder, "id" | "notificationId" | "missed">) => Promise<void>;
+  add: (
+    r: Omit<Reminder, "id" | "notificationIds" | "missed">
+  ) => Promise<void>;
   update: (id: string, patch: Partial<Reminder>) => Promise<void>;
   remove: (id: string) => Promise<void>;
   toggleEnabled: (id: string, enabled: boolean) => Promise<void>;
   refreshMissedFlags: () => void;
-}>({
+};
+
+const Ctx = createContext<CtxType>({
   reminders: [],
   add: async () => {},
   update: async () => {},
@@ -38,75 +49,136 @@ export const RemindersProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [reminders, setReminders] = useState<Reminder[]>([]);
 
+  // Load from disk (and migrate old shape if needed)
   useEffect(() => {
-    readReminders().then(setReminders);
+    (async () => {
+      const saved = await readReminders();
+      // Migrate: ensure fields exist in case of old data
+      const normalized: Reminder[] = (saved as any[]).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        hour: r.hour,
+        minute: r.minute,
+        enabled: r.enabled ?? true,
+        weekdays:
+          Array.isArray(r.weekdays) && r.weekdays.length
+            ? r.weekdays
+            : ALL_DAYS.slice(),
+        notificationIds: Array.isArray(r.notificationIds)
+          ? r.notificationIds
+          : r.notificationId
+          ? [r.notificationId]
+          : [],
+        missed: !!r.missed,
+      }));
+      setReminders(normalized);
+    })();
   }, []);
+
+  // Persist
   useEffect(() => {
     writeReminders(reminders);
   }, [reminders]);
 
-  const scheduleOrCancel = async (r: Reminder) => {
-    if (r.enabled) {
-      const id = await scheduleDailyNotification(
-        r.name,
-        `${r.dosage} at ${r.hour.toString().padStart(2, "0")}:${r.minute
-          .toString()
-          .padStart(2, "0")}`,
-        r.hour,
-        r.minute
-      );
-      r.notificationId = id;
-    } else {
-      await cancelNotification(r.notificationId);
-      r.notificationId = null;
-    }
-  };
+  async function reschedule(next: Reminder): Promise<string[]> {
+    await cancelNotifications(next.notificationIds);
+    if (!next.enabled) return [];
+    if (!next.weekdays.length) return [];
 
-  const add = async (
-    input: Omit<Reminder, "id" | "notificationId" | "missed">
-  ) => {
+    const title = next.name;
+    const body = `Reminder at ${String(next.hour).padStart(2, "0")}:${String(
+      next.minute
+    ).padStart(2, "0")}`;
+    return scheduleWeeklyNotifications(
+      title,
+      body,
+      next.hour,
+      next.minute,
+      next.weekdays
+    );
+  }
+
+  const add: CtxType["add"] = async (input) => {
     const r: Reminder = {
       id: uuidv4(),
-      notificationId: null,
+      name: input.name,
+      hour: input.hour,
+      minute: input.minute,
+      enabled: input.enabled,
+      weekdays: input.weekdays?.length ? input.weekdays : ALL_DAYS.slice(),
+      notificationIds: [],
       missed: false,
-      ...input,
     };
-    await scheduleOrCancel(r);
+    const ids = await reschedule(r);
+    r.notificationIds = ids;
     setReminders((list) => [r, ...list]);
   };
 
-  const update = async (id: string, patch: Partial<Reminder>) => {
-    setReminders((list) =>
-      list.map((r) => (r.id === id ? { ...r, ...patch } : r))
-    );
+  const update: CtxType["update"] = async (id, patch) => {
+    const current = reminders.find((x) => x.id === id);
+    if (!current) return;
+    const next: Reminder = {
+      ...current,
+      ...patch,
+      weekdays:
+        patch.weekdays !== undefined ? patch.weekdays : current.weekdays,
+      enabled: patch.enabled ?? current.enabled,
+      notificationIds: current.notificationIds,
+    };
+    const ids = await reschedule(next);
+    next.notificationIds = ids;
+    await cancelNotifications(current.notificationIds);
+
+    // reschedule if enabled and has days
+    if (next.enabled && next.weekdays.length) {
+      next.notificationIds = await scheduleWeeklyNotifications(
+        next.name,
+        `Reminder at ${String(next.hour).padStart(2, "0")}:${String(
+          next.minute
+        ).padStart(2, "0")}`,
+        next.hour,
+        next.minute,
+        next.weekdays
+      );
+    } else {
+      next.notificationIds = [];
+    }
+
+    setReminders((list) => list.map((x) => (x.id === id ? next : x)));
   };
 
-  const remove = async (id: string) => {
+  const remove: CtxType["remove"] = async (id) => {
     const r = reminders.find((x) => x.id === id);
-    if (r) await cancelNotification(r.notificationId);
+    if (r) await cancelNotifications(r.notificationIds);
     setReminders((list) => list.filter((x) => x.id !== id));
   };
 
-  const toggleEnabled = async (id: string, enabled: boolean) => {
-    setReminders((list) =>
-      list.map((item) => {
-        if (item.id !== id) return item;
-        const next = {
-          ...item,
-          enabled,
-          missed: enabled ? item.missed : false,
-        };
-        scheduleOrCancel(next);
-        return next;
-      })
-    );
+  const toggleEnabled: CtxType["toggleEnabled"] = async (id, enabled) => {
+    const current = reminders.find((x) => x.id === id);
+    if (!current) return;
+    let next: Reminder = {
+      ...current,
+      enabled,
+      missed: enabled ? current.missed : false,
+    };
+    if (enabled) {
+      const ids = await reschedule(next);
+      next.notificationIds = ids;
+    } else {
+      await cancelNotifications(next.notificationIds);
+      next.notificationIds = [];
+    }
+    setReminders((list) => list.map((x) => (x.id === id ? next : x)));
   };
 
   const refreshMissedFlags = () => {
+    const today = todayMon0();
     setReminders((list) =>
       list.map((item) => {
         if (!item.enabled) return item;
-        const missed = item.missed || isTimePassedToday(item.hour, item.minute);
+        const isToday = item.weekdays.includes(today);
+        const missedNow = isToday && isTimePassedToday(item.hour, item.minute);
+        const missed = item.missed || missedNow; // once missed, stays true until disabled
         return { ...item, missed };
       })
     );
