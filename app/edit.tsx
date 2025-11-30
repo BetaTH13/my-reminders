@@ -129,7 +129,7 @@ export default function EditReminder() {
           contentContainerStyle={{
             paddingHorizontal: 24,
             paddingTop: 12,
-            paddingBottom: insets.bottom + 110,
+            paddingBottom: insets.bottom + 24,
           }}
         >
           <Card accessibilityLabel={existing ? 'Edit reminder fields' : 'Add reminder fields'}>
@@ -291,22 +291,15 @@ export default function EditReminder() {
               </Card>
             </View>
           </Card>
-        </ScrollView>
 
-        {/* Sticky bottom actions: always reachable */}
-        <View
-          pointerEvents="box-none"
-          style={{
-            position: 'absolute',
-            left: 24,
-            right: 24,
-            bottom: insets.bottom + 16,
-          }}
-        >
+          {/* Actions now live inside the scrollable content so users must
+              scroll down to save/cancel (non-floating). */}
+          <View style={{ height: 16 }} />
           <View
             style={{
               flexDirection: actionsStack ? 'column' : 'row',
               gap: 12,
+              marginBottom: 8,
             }}
           >
             <Button
@@ -323,7 +316,9 @@ export default function EditReminder() {
               fullWidth={actionsStack}
             />
           </View>
-        </View>
+        </ScrollView>
+
+        {/* Removed floating/sticky actions — actions are inside the ScrollView */}
       </KeyboardAvoidingView>
     </View>
   );
